@@ -38,7 +38,7 @@ module.exports = function($window, mountRedraw) {
 
 	var currentResolver = sentinel, component, attrs, currentPath, lastUpdate
 
-	var RouterRoot = {
+	var RouterRoot = () => ({
 		onbeforeupdate: function() {
 			state = state ? 2 : 1
 			return !(!state || sentinel === currentResolver)
@@ -54,7 +54,7 @@ module.exports = function($window, mountRedraw) {
 			if (currentResolver) vnode = currentResolver.render(vnode[0])
 			return vnode
 		},
-	}
+	})
 
 	var SKIP = route.SKIP = {}
 
@@ -98,7 +98,7 @@ module.exports = function($window, mountRedraw) {
 					var update = lastUpdate = function(comp) {
 						if (update !== lastUpdate) return
 						if (comp === SKIP) return loop(i + 1)
-						component = comp != null && (typeof comp.view === "function" || typeof comp === "function")? comp : "div"
+						component = typeof comp === "function" ? comp : "div"
 						attrs = data.params, currentPath = path, lastUpdate = null
 						currentResolver = payload.render ? payload : null
 						if (state === 2) mountRedraw.redraw()
@@ -109,7 +109,7 @@ module.exports = function($window, mountRedraw) {
 					}
 					// There's no understating how much I *wish* I could
 					// use `async`/`await` here...
-					if (payload.view || typeof payload === "function") {
+					if (typeof payload === "function") {
 						payload = {}
 						update(localComp)
 					}
@@ -201,7 +201,7 @@ module.exports = function($window, mountRedraw) {
 	}
 	route.get = function() {return currentPath}
 	route.prefix = "#!"
-	route.Link = {
+	route.Link = () => ({
 		view: function(vnode) {
 			// Omit the used parameters from the rendered element - they are
 			// internal. Also, censor the various lifecycle methods.
@@ -269,7 +269,7 @@ module.exports = function($window, mountRedraw) {
 			}
 			return child
 		},
-	}
+	})
 	route.param = function(key) {
 		return attrs && key != null ? attrs[key] : attrs
 	}
