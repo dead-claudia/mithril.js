@@ -336,11 +336,254 @@ m.normalize = (node) => {
 	return node
 }
 
+/*
+Context is very specially structured for performance and low overhead.
+
+## Use of arrays for the context key/value tables
+
+Arrays are used to ensure easy and fast access. Context variables are rarely more than a few in
+number, and it's faster to perform iterative lookups in small arrays than to perform hash table
+lookups with same-size hash tables. (Currently, engines use hash tables for all sizes, so this
+optimization is very useful to explicitly add.)
+
+Arrays are also extremely fast to copy, and `array.slice()` is explicitly fast-pathed in many
+engines. (In particular, V8 uses libc's `memcpy`, which may use accelerated instructions like x86's
+`rep movsb`.) There's no hashing, so storage is basically zero overhead.
+
+## Index caching
+
+An inline cache is used for the map index to avoid a full lookup. It's just two loads and a pointer
+compare, which is way faster than for a map. Cross-snapshot accesses are rare, so it's okay to not
+optimize.
+
+> To boost performance of this cache, it's kept consistently up to date on set, so if you always
+> follow the same get and set sequence for every snapshot, you'll always get cache hits.
+*/
+
+/**
+ * @template T
+ */
+m.Var = class Var {
+	/**  @param {T} init */
+	constructor(init) {
+		// This first property is used both for easier debugging and for lookups.
+		/** @internal */ this.k = resourceId++
+		/** @internal */ this.i = -1
+		/** @internal */ this.s = -1
+		/** @internal */ this.d = init
+	}
+
+	/** @param {T} [value] @return {void | T} */
+	$(value) {
+		var table = currentTable
+		var snapshotId = currentSnapshotId
+		var {k, i, s, d} = this
+		var len = table.length
+
+		this.s = snapshotId
+
+		missing:
+		if (i >= 0) {
+			found:
+			if (s !== snapshotId || i >= len || table[i] !== k) {
+				i = len
+				// It's fine that `this.i` is set unconditionally - if it's `-1`, it'll get fixed to
+				// point to a positive integer later.
+				while (i) if (table[this.i = i -= 2] === k) break found
+				break missing
+			}
+			if (!arguments.length) return table[i + 1]
+			// Only valid if `i` matches the current base.
+			if (i >= currentBase) {
+				table[i + 1] = value
+				return
+			}
+		}
+
+		this.i = len
+		if (!arguments.length) return d
+		table.push(k, value)
+	}
+
+	/** @type {T} */
+	get v() { return this.$() }
+	set v(value) { this.$(value) }
+
+	/**
+	 * @template {any[]} A
+	 * @template T, R
+	 * @param {T} value
+	 * @param {(...args: A) => R} f
+	 * @param {A} args
+	 * @returns {R}
+	 */
+	set(value, f, ...args) {
+		return executeScope(this, value, null, f, ...args)
+	}
+}
+
+/**
+ * @template {any[]} A
+ * @template T, R
+ * @this {T}
+ * @param {(...args: A) => R} f
+ * @param {A} args
+ * @returns {R}
+ */
+// Simpler to write in terms of `m.enter`. It's likely to get inlined fully anyways in hot code.
+m.scope = (f, ...args) => executeScope(null, null, null, f, ...args)
+
+// Note: the array subtyping is an implementation detail. The only public interface are the methods
+// present in this class.
+m.Snapshot = class Snapshot {
+	/** @internal @property {any[]} t */
+	/** @internal @property {number} k */
+
+	// The part without `keys` has to be efficient. It could be called a *lot*, and restore also
+	// has to be fast. Note that as keys are deduplicated on set, this does *not* have to check
+	// that at all.
+	/** @param {Iterable<Var<any>>} [keys] */
+	constructor(keys) {
+		// This property is used both for easier debugging and for lookups.
+		this.k = resourceId++
+		if (keys) {
+			// It's not the common case. It's okay to be slow. If speed becomes a problem, it can
+			// be addressed then.
+			// TODO: test this.
+			this.t = []
+			for (var key of new Set(keys)) {
+				this.t.push(key.k, key.v)
+			}
+		} else {
+			// The V8 fast path for `.slice()` requires the prototype to be the original array
+			// prototype. I'd rather the class subtype `Array` for memory reasons, but that just
+			// isn't feasible.
+			this.t = currentTable.slice()
+		}
+	}
+
+	/**
+	 * @template {any[]} A
+	 * @template R
+	 * @param {(...args: A) => R} f
+	 * @param {A} args
+	 * @returns {R}
+	 */
+	enter(f, ...args) {
+		return executeScope(null, null, this, f, ...args)
+	}
+
+	/**
+	 * @template {any[]} A
+	 * @template {any[]} B
+	 * @template R
+	 * @param {(...args: [...A, ...B]) => R} f
+	 * @param {A} args
+	 * @returns {(...rest: B) => R}
+	 */
+	wrap(f, ...args) {
+		return this.enter.bind(this, f, ...args)
+	}
+
+	/**
+	 * @template {any[]} A
+	 * @template R
+	 * @param {(...args: A) => Generator<any, R, any>} f
+	 * @param {A} args
+	 * @returns {Promise<Awaited<R>>}
+	 */
+	run(f, ...args) {
+		return this.enter(m.run, f, ...args)
+	}
+}
+
+/**
+ * @template {any[]} A
+ * @template {any[]} B
+ * @template R
+ * @param {(...args: [...A, ...B]) => R} f
+ * @param {A} args
+ */
+m.wrap = (f, ...args) => new m.Snapshot().wrap(f, ...args)
+
+/**
+ * @template {any[]} A
+ * @template R
+ * @param {Snapshot} saved
+ * @param {(...args: A) => Generator<any, R, any>} f
+ * @param {A} args
+ * @returns {Promise<Awaited<R>>}
+ */
+m.run = async (f, ...args) => {
+	var snapshot = new m.Snapshot()
+	var value, iter, iterNext
+	var iterThrow = executeScope(false, null, snapshot, () => {
+		iter = checkCallback(f, false, "f")(...args)
+		iterNext = checkCallback(iter.next, false, "iter.next")
+		return checkCallback(iter.throw, true, "iter.throw")
+	})
+	var iterAdvance = iterNext
+
+	while (executeScope(false, null, snapshot, () => {
+		var result = iterAdvance.call(iter, value)
+		value = result.value
+		return !result.done
+	})) {
+		try {
+			value = await value
+			iterAdvance = iterNext
+		} catch (e) {
+			value = e
+			if ((iterAdvance = iterThrow) == null) throw e
+		}
+	}
+
+	return value
+}
+
 var resolveSpecialFragment = (type, attrs, ...children) => {
 	var resolved = children.length === 1 && Array.isArray(children[0]) ? [...children[0]] : [...children]
 	for (var i = 0; i < resolved.length; i++) resolved[i] = m.normalize(resolved[i])
 	return Vnode(type, null, attrs, resolved)
 }
+
+/**
+ * @template {any[]} A
+ * @template R
+ * @param {(...args: A) => R} f
+ * @param {A} args
+ * @returns {R}
+ */
+var executeScope = (cvar, value, snapshot, f, ...args) => {
+	checkCallback(f, false, "f")
+
+	var prevSnapshotId = currentSnapshotId
+	var prevTable = currentTable
+	var prevBase = currentBase
+
+	if (snapshot) {
+		currentSnapshotId = snapshot.k
+		currentTable = snapshot.t
+	}
+
+	currentBase = currentTable.length
+
+	try {
+		if (cvar) cvar.$(value)
+		return f(...args)
+	} finally {
+		if (cvar !== false) currentTable.length = currentBase
+		currentSnapshotId = prevSnapshotId
+		currentTable = prevTable
+		currentBase = prevBase
+	}
+}
+
+// Just needs to be higher than `currentSnapshotId`.
+var resourceId = 1
+var currentSnapshotId = 0
+var currentTable = []
+var currentBase = 0
 
 var xlinkNs = "http://www.w3.org/1999/xlink"
 var htmlNs = "http://www.w3.org/1999/xhtml"
