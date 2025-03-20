@@ -25,87 +25,97 @@ export function restoreDOMGlobals() {
 	G.document = originalDocument
 }
 
-export function setupGlobals(env = {}) {
-	let registeredRoots
-	/** @type {ReturnType<import("./browserMock.js")["default"]>} */ let $window
-	/** @type {ReturnType<import("./throttleMock.js")["default"]>} */ let rafMock
+/**
+ * @typedef SetupState
+ * @property {Set<any>} registeredRoots
+ * @property {ReturnType<import("./browserMock.js")["default"]>} $window
+ * @property {ReturnType<import("./throttleMock.js")["default"]>} rafMock
+ */
 
-	function register(root) {
-		registeredRoots.add(root)
-		return root
-	}
+/** @returns {SetupState} */
+function doInit(env) {
+	const $window = browserMock({...env})
+	const rafMock = throttleMocker()
+	const registeredRoots = new Set([$window.document.body])
+	G.window = $window.window
+	G.document = $window.document
+	$window.requestAnimationFrame = rafMock.schedule
+	$window.cancelAnimationFrame = rafMock.clear
 
-	function initialize(env) {
-		$window = browserMock(env)
-		rafMock = throttleMocker()
-		registeredRoots = new Set([$window.document.body])
-
-		G.window = $window.window
-		G.document = $window.document
-		$window.requestAnimationFrame = rafMock.schedule
-		$window.cancelAnimationFrame = rafMock.clear
-
-		if (env && env.expectNoConsoleError) {
-			console.error = (...args) => {
-				if (typeof process === "function") process.exitCode = 1
-				var replacement = console.error
-				// Node's `console.trace` delegates to `console.error` as a property. Have it
-				// actually call what it intended to call.
-				try {
-					console.error = originalConsoleError
-					console.trace("Unexpected `console.error` call")
-				} finally {
-					console.error = replacement
-				}
-				originalConsoleError.apply(console, args)
-			}
-		}
-	}
-
-	o.beforeEach(() => {
-		initialize({...env})
-		return env.initialize && env.initialize(G)
-	})
-
-	o.afterEach(() => {
-		const errors = []
-		const roots = registeredRoots
-		registeredRoots = null
-		for (const root of roots) {
+	if (env && env.expectNoConsoleError) {
+		console.error = (...args) => {
+			if (typeof process === "function") process.exitCode = 1
+			var replacement = console.error
+			// Node's `console.trace` delegates to `console.error` as a property. Have it
+			// actually call what it intended to call.
 			try {
-				m.render(root, null)
-			} catch (e) {
-				errors.push(e)
+				console.error = originalConsoleError
+				console.trace("Unexpected `console.error` call")
+			} finally {
+				console.error = replacement
 			}
+			originalConsoleError.apply(console, args)
 		}
-		var mock = rafMock
-		$window = null
-		rafMock = null
-		restoreDOMGlobals()
-		console.error = originalConsoleError
-		clearPending()
-		o(errors).deepEquals([])
-		errors.length = 0
-		o(mock.queueLength()).equals(0)
-		return env.cleanup && env.cleanup(G)
-	})
-
-	return {
-		initialize,
-		register,
-
-		/** @returns {ReturnType<import("./browserMock.js")["default"]>} */
-		get window() {
-			return $window
-		},
-
-		/** @returns {ReturnType<import("./throttleMock.js")["default"]>} */
-		get rafMock() {
-			return rafMock
-		},
-
-		get root() {
-			return $window.document.body
-		},
 	}
+	return {$window, rafMock, registeredRoots}
+}
+
+/** @param {SetupState} state */
+function doCleanup(state) {
+	const errors = []
+	for (const root of state.registeredRoots) {
+		try {
+			m.render(root, null)
+		} catch (e) {
+			errors.push(e)
+		}
+	}
+	restoreDOMGlobals()
+	console.error = originalConsoleError
+	clearPending()
+	o(errors).deepEquals([])
+	errors.length = 0
+	o(state.rafMock.queueLength()).equals(0)
+}
+
+class GlobalState {
+	constructor(env) {
+		this._ = null
+		this.register = (root) => {
+			this._.registeredRoots.add(root)
+			return root
+		}
+
+		this.initialize = (env) => {
+			this._ = doInit(env)
+		}
+
+		o.beforeEach(() => {
+			this._ = doInit(env)
+			return env.initialize && env.initialize(G)
+		})
+
+		o.afterEach(() => {
+			const state = this._
+			this._ = null
+			doCleanup(state)
+			return env.cleanup && env.cleanup(G)
+		})
+	}
+
+	get window() {
+		return this._.$window
+	}
+
+	get rafMock() {
+		return this._.rafMock
+	}
+
+	get root() {
+		return this._.$window.document.body
+	}
+}
+
+export function setupGlobals(env = {}) {
+	return new GlobalState(env)
 }

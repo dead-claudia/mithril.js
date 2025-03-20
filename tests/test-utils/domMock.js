@@ -1646,7 +1646,7 @@ o.spec("domMock", function() {
 		o("basics", function() {
 			o(typeof G.window.__getSpies).equals("function")
 			G.initialize()
-			o("__getSpies" in G.window).equals(false)
+			o(G.window.__getSpies).equals(undefined)
 		})
 		o("input elements have spies on value setters", function() {
 			var input = G.window.document.createElement("input")

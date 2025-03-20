@@ -1,5 +1,6 @@
 export default function parseURL(url, root) {
-	var data = {}
+	var protocol, hostname, port, pathname
+
 	var protocolIndex = url.indexOf("://")
 	var pathnameIndex = protocolIndex > -1 ? url.indexOf("/", protocolIndex + 3) : url.indexOf("/")
 	var searchIndex = url.indexOf("?")
@@ -12,18 +13,18 @@ export default function parseURL(url, root) {
 		if (pathnameIndex < 0) pathnameIndex = url.length
 		var portIndex = url.indexOf(":", protocolIndex + 1)
 		if (portIndex < 0) portIndex = pathnameIndex
-		data.protocol = url.slice(0, protocolIndex + 1)
-		data.hostname = url.slice(protocolIndex + 3, portIndex)
-		data.port = url.slice(portIndex + 1, pathnameIndex)
-		data.pathname = url.slice(pathnameIndex, pathnameEnd) || "/"
+		protocol = url.slice(0, protocolIndex + 1)
+		hostname = url.slice(protocolIndex + 3, portIndex)
+		port = url.slice(portIndex + 1, pathnameIndex)
+		pathname = url.slice(pathnameIndex, pathnameEnd) || "/"
 	}
 	else {
-		data.protocol = root.protocol
-		data.hostname = root.hostname
-		data.port = root.port
+		protocol = root.protocol
+		hostname = root.hostname
+		port = root.port
 		if (pathnameIndex === 0) {
 			//it's an absolute path
-			data.pathname = url.slice(pathnameIndex, pathnameEnd) || "/"
+			pathname = url.slice(pathnameIndex, pathnameEnd) || "/"
 		}
 		else if (searchIndex !== 0 && hashIndex !== 0) {
 			//it's a relative path
@@ -35,11 +36,10 @@ export default function parseURL(url, root) {
 			pathname = path + normalized
 			while (dotdot.test(pathname)) pathname = pathname.replace(dotdot, "")
 			pathname = pathname.replace(/\/\.\//g, "/").replace(/^(\/\.{2})+/, "") || "/"
-			data.pathname = pathname
 		}
 	}
 	var searchEnd = hashIndex > -1 ? hashIndex : url.length
-	data.search = searchIndex > -1 ? url.slice(searchIndex, searchEnd) : ""
-	data.hash = hashIndex > -1 ? url.slice(hashIndex) : ""
-	return data
+	var search = searchIndex > -1 ? url.slice(searchIndex, searchEnd) : ""
+	var hash = hashIndex > -1 ? url.slice(hashIndex) : ""
+	return {protocol, hostname, port, pathname, search, hash}
 }

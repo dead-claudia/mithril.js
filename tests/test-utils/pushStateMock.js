@@ -480,7 +480,7 @@ o.spec("pushStateMock", function() {
 
 			callAsync(function(){
 				o(G.window.onhashchange.callCount).equals(1)
-				o(G.window.onhashchange.args[0].type).equals("hashchange")
+				o(G.window.onhashchange.args[0] && G.window.onhashchange.args[0].type).equals("hashchange")
 				done()
 			})
 		})

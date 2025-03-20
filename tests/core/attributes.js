@@ -53,7 +53,7 @@ o.spec("attributes", function() {
 			var spies = []
 
 			G.window.document.createElement = function(tag, is){
-				var el = f(tag, is)
+				var el = f.call(G.window.document, tag, is)
 				var spy = o.spy(el.setAttribute)
 				el.setAttribute = spy
 				spies.push(spy)
@@ -88,7 +88,7 @@ o.spec("attributes", function() {
 			var setters = []
 
 			G.window.document.createElement = function(tag, is){
-				var el = f(tag, is)
+				var el = f.call(G.window.document, tag, is)
 				var spy = o.spy(el.setAttribute)
 				el.setAttribute = spy
 				spies.push(spy)
