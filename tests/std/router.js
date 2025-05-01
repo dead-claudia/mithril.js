@@ -1,5 +1,6 @@
 import o from "ospec"
 
+import {installNavMock} from "../../test-utils/navigation.js"
 import {setupGlobals} from "../../test-utils/global.js"
 
 import m from "../../src/entry/mithril.esm.js"
@@ -11,7 +12,16 @@ o.spec("route", () => {
 				var fullHost = `${env.protocol}//${env.hostname === "/" ? "" : env.hostname}`
 				var fullPrefix = `${fullHost}${prefix[0] === "/" ? "" : "/"}${prefix ? `${prefix}/` : ""}`
 
-				var G = setupGlobals({...env, expectNoConsoleError: true})
+				var uninstall
+				var G = setupGlobals({
+					expectNoConsoleError: true,
+					initialize(G) {
+						uninstall = installNavMock(G.window, env)
+					},
+					cleanup() {
+						uninstall()
+					},
+				})
 
 				o("returns the right route on init", () => {
 					G.window.location.href = `${prefix}/`

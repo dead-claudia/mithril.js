@@ -34,7 +34,7 @@ export function restoreDOMGlobals() {
 
 /** @returns {SetupState} */
 function doInit(env) {
-	const $window = browserMock({...env})
+	const $window = browserMock(env)
 	const rafMock = throttleMocker()
 	const registeredRoots = new Set([$window.document.body])
 	G.window = $window.window
