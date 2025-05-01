@@ -1,5 +1,6 @@
 import o from "ospec"
 
+import {installValueSetterSpy} from "../../test-utils/setterSpy.js"
 import {setupGlobals} from "../../test-utils/global.js"
 
 import m from "../../src/entry/mithril.esm.js"
@@ -124,8 +125,6 @@ o.spec("form inputs", function() {
 		})
 
 		o("retains file input value attribute if DOM value is the same as vdom value and is non-empty", function() {
-			G.initialize({spy: o.spy})
-
 			var input = m("input", {type: "file", value: "", onclick: function() {}})
 			var updated1 = m("input", {type: "file", value: "test.png", onclick: function() {}})
 			var updated2 = m("input", {type: "file", value: "test.png", onclick: function() {}})
@@ -133,11 +132,12 @@ o.spec("form inputs", function() {
 			var error = console.error
 
 			m.render(G.root, input)
+			var valueSetter = installValueSetterSpy(input.d)
 
 			// Verify our assumptions about the outer element state
-			o(G.window.__getSpies(input.d).valueSetter.callCount).equals(0)
+			o(valueSetter.callCount).equals(0)
 			input.d.value = "test.png"
-			o(G.window.__getSpies(input.d).valueSetter.callCount).equals(1)
+			o(valueSetter.callCount).equals(1)
 
 			try {
 				console.error = spy
@@ -148,7 +148,7 @@ o.spec("form inputs", function() {
 
 			o(updated1.d.value).equals("test.png")
 			o(spy.callCount).equals(0)
-			o(G.window.__getSpies(updated1.d).valueSetter.callCount).equals(1)
+			o(valueSetter.callCount).equals(1)
 
 			try {
 				console.error = spy
@@ -159,7 +159,7 @@ o.spec("form inputs", function() {
 
 			o(updated2.d.value).equals("test.png")
 			o(spy.callCount).equals(0)
-			o(G.window.__getSpies(updated2.d).valueSetter.callCount).equals(1)
+			o(valueSetter.callCount).equals(1)
 		})
 	})
 

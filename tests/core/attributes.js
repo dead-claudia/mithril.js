@@ -1,5 +1,6 @@
 import o from "ospec"
 
+import {installValueSetterSpy} from "../../test-utils/setterSpy.js"
 import {setupGlobals} from "../../test-utils/global.js"
 
 import m from "../../src/entry/mithril.esm.js"
@@ -263,8 +264,6 @@ o.spec("attributes", function() {
 			o(c.d.value).equals("0")
 		})
 		o("isn't set when equivalent to the previous value and focused", function() {
-			G.initialize({spy: o.spy})
-
 			var a =m("input")
 			var b = m("input", {value: "1"})
 			var c = m("input", {value: "1"})
@@ -272,30 +271,30 @@ o.spec("attributes", function() {
 			var e = m("input", {value: 2})
 
 			m.render(G.root, a)
-			var spies = G.window.__getSpies(a.d)
+			var valueSetter = installValueSetterSpy(a.d)
 			a.d.focus()
 
-			o(spies.valueSetter.callCount).equals(0)
+			o(valueSetter.callCount).equals(0)
 
 			m.render(G.root, b)
 
 			o(b.d.value).equals("1")
-			o(spies.valueSetter.callCount).equals(1)
+			o(valueSetter.callCount).equals(1)
 
 			m.render(G.root, c)
 
 			o(c.d.value).equals("1")
-			o(spies.valueSetter.callCount).equals(1)
+			o(valueSetter.callCount).equals(1)
 
 			m.render(G.root, d)
 
 			o(d.d.value).equals("1")
-			o(spies.valueSetter.callCount).equals(1)
+			o(valueSetter.callCount).equals(1)
 
 			m.render(G.root, e)
 
 			o(d.d.value).equals("2")
-			o(spies.valueSetter.callCount).equals(2)
+			o(valueSetter.callCount).equals(2)
 		})
 	})
 	o.spec("input.type", function() {
@@ -332,8 +331,6 @@ o.spec("attributes", function() {
 			o(b.d.value).equals("")
 		})
 		o("isn't set when equivalent to the previous value and focused", function() {
-			G.initialize({spy: o.spy})
-
 			var a = m("textarea")
 			var b = m("textarea", {value: "1"})
 			var c = m("textarea", {value: "1"})
@@ -341,30 +338,30 @@ o.spec("attributes", function() {
 			var e = m("textarea", {value: 2})
 
 			m.render(G.root, a)
-			var spies = G.window.__getSpies(a.d)
+			var valueSetter = installValueSetterSpy(a.d)
 			a.d.focus()
 
-			o(spies.valueSetter.callCount).equals(0)
+			o(valueSetter.callCount).equals(0)
 
 			m.render(G.root, b)
 
 			o(b.d.value).equals("1")
-			o(spies.valueSetter.callCount).equals(1)
+			o(valueSetter.callCount).equals(1)
 
 			m.render(G.root, c)
 
 			o(c.d.value).equals("1")
-			o(spies.valueSetter.callCount).equals(1)
+			o(valueSetter.callCount).equals(1)
 
 			m.render(G.root, d)
 
 			o(d.d.value).equals("1")
-			o(spies.valueSetter.callCount).equals(1)
+			o(valueSetter.callCount).equals(1)
 
 			m.render(G.root, e)
 
 			o(d.d.value).equals("2")
-			o(spies.valueSetter.callCount).equals(2)
+			o(valueSetter.callCount).equals(2)
 		})
 	})
 	o.spec("link href", function() {
@@ -476,8 +473,6 @@ o.spec("attributes", function() {
 			o(c.d.value).equals("0")
 		})
 		o("isn't set when equivalent to the previous value", function() {
-			G.initialize({spy: o.spy})
-
 			var a = m("option")
 			var b = m("option", {value: "1"})
 			var c = m("option", {value: "1"})
@@ -485,29 +480,29 @@ o.spec("attributes", function() {
 			var e = m("option", {value: 2})
 
 			m.render(G.root, a)
-			var spies = G.window.__getSpies(a.d)
+			var valueSetter = installValueSetterSpy(a.d)
 
-			o(spies.valueSetter.callCount).equals(0)
+			o(valueSetter.callCount).equals(0)
 
 			m.render(G.root, b)
 
 			o(b.d.value).equals("1")
-			o(spies.valueSetter.callCount).equals(1)
+			o(valueSetter.callCount).equals(1)
 
 			m.render(G.root, c)
 
 			o(c.d.value).equals("1")
-			o(spies.valueSetter.callCount).equals(1)
+			o(valueSetter.callCount).equals(1)
 
 			m.render(G.root, d)
 
 			o(d.d.value).equals("1")
-			o(spies.valueSetter.callCount).equals(1)
+			o(valueSetter.callCount).equals(1)
 
 			m.render(G.root, e)
 
 			o(d.d.value).equals("2")
-			o(spies.valueSetter.callCount).equals(2)
+			o(valueSetter.callCount).equals(2)
 		})
 	})
 	o.spec("select.value", function() {

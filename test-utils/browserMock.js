@@ -562,29 +562,11 @@ class HTMLAnchorElement extends Element {
 	}
 }
 
-function registerSpies(element, spies) {
-	var spyMap = element.ownerDocument.defaultView.__spyMap
-	var prev = spyMap.get(element)
-	if (prev) {
-		Object.assign(prev, spies)
-	} else {
-		spyMap.set(element, spies)
-	}
-}
-
 class HTMLInputElement extends Element {
-	constructor(ownerDocument, spy) {
+	constructor(ownerDocument) {
 		super("INPUT", null, ownerDocument)
 		this._checked = undefined
 		this._value = ""
-
-		registerSpies(this, {
-			valueSetter: this._valueSetter = spy(this._setValue),
-		})
-	}
-
-	_setValue(v) {
-		this._value = v === null ? "" : `${v}`
 	}
 
 	get checked() {
@@ -600,7 +582,7 @@ class HTMLInputElement extends Element {
 	}
 
 	set value(value) {
-		this._valueSetter(value)
+		this._value = value === null ? "" : `${value}`
 	}
 
 	get valueAsDate() {
@@ -647,17 +629,9 @@ class HTMLInputElement extends Element {
 }
 
 class HTMLTextAreaElement extends Element {
-	constructor(ownerDocument, spy) {
+	constructor(ownerDocument) {
 		super("TEXTAREA", null, ownerDocument)
 		this._value = undefined
-
-		registerSpies(this, {
-			valueSetter: this._valueSetter = spy(this._setValue),
-		})
-	}
-
-	_setValue(v) {
-		this._value = v === null ? "" : `${v}`
 	}
 
 	get value() {
@@ -669,7 +643,7 @@ class HTMLTextAreaElement extends Element {
 	}
 
 	set value(value) {
-		this._valueSetter(value)
+		this._value = value === null ? "" : `${value}`
 	}
 }
 
@@ -724,32 +698,10 @@ function getOptionValue(element) {
 }
 
 class HTMLSelectElement extends Element {
-	constructor(ownerDocument, spy) {
+	constructor(ownerDocument) {
 		super("SELECT", null, ownerDocument)
 		// this._selectedValue = undefined
 		this._selectedIndex = 0
-
-		registerSpies(this, {
-			valueSetter: this._valueSetter = spy(this._setValue)
-		})
-	}
-
-	_setValue(value) {
-		if (value === null) {
-			this._selectedIndex = -1
-		} else {
-			var options = getOptions(this)
-			var stringValue = `${value}`
-			for (var i = 0; i < options.length; i++) {
-				if (getOptionValue(options[i]) === stringValue) {
-					// this._selectedValue = stringValue
-					this._selectedIndex = i
-					return
-				}
-			}
-			// this._selectedValue = stringValue
-			this._selectedIndex = -1
-		}
 	}
 
 	get selectedIndex() {
@@ -779,20 +731,27 @@ class HTMLSelectElement extends Element {
 	}
 
 	set value(value) {
-		this._valueSetter(value)
+		if (value === null) {
+			this._selectedIndex = -1
+		} else {
+			var options = getOptions(this)
+			var stringValue = `${value}`
+			for (var i = 0; i < options.length; i++) {
+				if (getOptionValue(options[i]) === stringValue) {
+					// this._selectedValue = stringValue
+					this._selectedIndex = i
+					return
+				}
+			}
+			// this._selectedValue = stringValue
+			this._selectedIndex = -1
+		}
 	}
 }
 
 class HTMLOptionElement extends Element {
-	constructor(ownerDocument, spy) {
+	constructor(ownerDocument) {
 		super("OPTION", null, ownerDocument)
-		registerSpies(this, {
-			valueSetter: this._valueSetter = spy(this._setValue)
-		})
-	}
-
-	_setValue(value) {
-		this.setAttribute("value", value)
 	}
 
 	get value() {
@@ -800,7 +759,7 @@ class HTMLOptionElement extends Element {
 	}
 
 	set value(value) {
-		this._valueSetter(value)
+		this.setAttribute("value", value)
 	}
 
 	// TODO? handle `selected` without a parent (works in browsers)
@@ -1020,10 +979,9 @@ class History {
 }
 
 class Document {
-	constructor(window, {spy = (f) => f} = {}) {
+	constructor(window) {
 		this.__activeElement = null
 		this.defaultView = window
-		this.__spy = spy
 	}
 	createElement(tag) {
 		if (!this) throw new Error("`this` must be the document")
@@ -1032,11 +990,11 @@ class Document {
 
 		switch (tag) {
 			case "A": return new HTMLAnchorElement(this)
-			case "INPUT": return new HTMLInputElement(this, this.__spy)
-			case "TEXTAREA": return new HTMLTextAreaElement(this, this.__spy)
+			case "INPUT": return new HTMLInputElement(this)
+			case "TEXTAREA": return new HTMLTextAreaElement(this)
 			case "CANVAS": return new HTMLCanvasElement(this)
-			case "SELECT": return new HTMLSelectElement(this, this.__spy)
-			case "OPTION": return new HTMLOptionElement(this, this.__spy)
+			case "SELECT": return new HTMLSelectElement(this)
+			case "OPTION": return new HTMLOptionElement(this)
 			default: return new Element(tag, null, this)
 		}
 	}
@@ -1063,7 +1021,7 @@ class Document {
 
 class Window {
 	constructor(env) {
-		var document = this.document = new Document(this, env)
+		var document = this.document = new Document(this)
 		document.documentElement = new Element("HTML", null)
 		document.documentElement.appendChild(document.head = new Element("HEAD", null, document))
 		document.documentElement.appendChild(document.body = new Element("BODY", null, document))
@@ -1074,7 +1032,6 @@ class Window {
 
 		this.__delay = 16
 		this.__last = 0
-		this.__spyMap = new Map()
 
 		this.onpopstate = null
 		this.onhashchange = null
@@ -1107,11 +1064,6 @@ class Window {
 
 	removeEventListener(name, handler) {
 		this["on" + name] = handler
-	}
-
-	__getSpies(element) {
-		if (element == null || typeof element !== "object") throw new Error("Element expected")
-		return this.__spyMap.get(element)
 	}
 }
 
