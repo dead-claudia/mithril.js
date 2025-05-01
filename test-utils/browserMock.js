@@ -562,13 +562,23 @@ class HTMLAnchorElement extends Element {
 	}
 }
 
+function registerSpies(element, spies) {
+	var spyMap = element.ownerDocument.defaultView.__spyMap
+	var prev = spyMap.get(element)
+	if (prev) {
+		Object.assign(prev, spies)
+	} else {
+		spyMap.set(element, spies)
+	}
+}
+
 class HTMLInputElement extends Element {
 	constructor(ownerDocument, spy) {
 		super("INPUT", null, ownerDocument)
 		this._checked = undefined
 		this._value = ""
 
-		ownerDocument.defaultView.__registerSpies(this, {
+		registerSpies(this, {
 			valueSetter: this._valueSetter = spy(this._setValue),
 		})
 	}
@@ -641,7 +651,7 @@ class HTMLTextAreaElement extends Element {
 		super("TEXTAREA", null, ownerDocument)
 		this._value = undefined
 
-		ownerDocument.defaultView.__registerSpies(this, {
+		registerSpies(this, {
 			valueSetter: this._valueSetter = spy(this._setValue),
 		})
 	}
@@ -719,7 +729,7 @@ class HTMLSelectElement extends Element {
 		// this._selectedValue = undefined
 		this._selectedIndex = 0
 
-		ownerDocument.defaultView.__registerSpies(this, {
+		registerSpies(this, {
 			valueSetter: this._valueSetter = spy(this._setValue)
 		})
 	}
@@ -776,7 +786,7 @@ class HTMLSelectElement extends Element {
 class HTMLOptionElement extends Element {
 	constructor(ownerDocument, spy) {
 		super("OPTION", null, ownerDocument)
-		ownerDocument.defaultView.__registerSpies(this, {
+		registerSpies(this, {
 			valueSetter: this._valueSetter = spy(this._setValue)
 		})
 	}
@@ -815,7 +825,7 @@ function prefix(prefix, value) {
 }
 
 class NavState {
-	constructor(env) {
+	constructor(window, env) {
 		this.protocol = String(env.protocol || "http:")
 		this.hostname = String(env.hostname || "localhost")
 
@@ -828,7 +838,7 @@ class NavState {
 		this.future = []
 
 		this.hashchangePending = false
-		this.$window = null
+		this.$window = window
 
 		this.past.push({url: this.getURL(), isNew: true, state: null, title: null})
 	}
@@ -1010,10 +1020,10 @@ class History {
 }
 
 class Document {
-	constructor(spy) {
+	constructor(window, {spy = (f) => f} = {}) {
 		this.__activeElement = null
-		this.defaultView = null
-		this.spy = spy
+		this.defaultView = window
+		this.__spy = spy
 	}
 	createElement(tag) {
 		if (!this) throw new Error("`this` must be the document")
@@ -1022,11 +1032,11 @@ class Document {
 
 		switch (tag) {
 			case "A": return new HTMLAnchorElement(this)
-			case "INPUT": return new HTMLInputElement(this, this.spy)
-			case "TEXTAREA": return new HTMLTextAreaElement(this, this.spy)
+			case "INPUT": return new HTMLInputElement(this, this.__spy)
+			case "TEXTAREA": return new HTMLTextAreaElement(this, this.__spy)
 			case "CANVAS": return new HTMLCanvasElement(this)
-			case "SELECT": return new HTMLSelectElement(this, this.spy)
-			case "OPTION": return new HTMLOptionElement(this, this.spy)
+			case "SELECT": return new HTMLSelectElement(this, this.__spy)
+			case "OPTION": return new HTMLOptionElement(this, this.__spy)
 			default: return new Element(tag, null, this)
 		}
 	}
@@ -1050,71 +1060,61 @@ class Document {
 	}
 }
 
-export default function browserMock(env = {}) {
-	var spy = env.spy || ((f) => f)
-	var spymap = new Map()
-	var registerSpies = () => {}
-	var getSpies
 
-	if (env.spy) {
-		registerSpies = (element, spies) => {
-			var prev = spymap.get(element)
-			if (prev) {
-				Object.assign(prev, spies)
-			} else {
-				spymap.set(element, spies)
+class Window {
+	constructor(env) {
+		var document = this.document = new Document(this, env)
+		document.documentElement = new Element("HTML", null)
+		document.documentElement.appendChild(document.head = new Element("HEAD", null, document))
+		document.documentElement.appendChild(document.body = new Element("BODY", null, document))
+
+		var navState = new NavState(this, env)
+		this.location = new Location(navState)
+		this.history = new History(navState)
+
+		this.__delay = 16
+		this.__last = 0
+		this.__spyMap = new Map()
+
+		this.onpopstate = null
+		this.onhashchange = null
+		this.onunload = null
+	}
+
+	get window() {
+		return this
+	}
+
+	requestAnimationFrame(callback) {
+		var elapsed = performance.now() - this.__last
+		return setTimeout(() => {
+			this.__last = performance.now()
+			try {
+				callback()
+			} catch (e) {
+				console.error(e)
 			}
-		}
-
-		getSpies = (element) => {
-			if (element == null || typeof element !== "object") throw new Error("Element expected")
-			return spymap.get(element)
-		}
+		}, this.__delay - elapsed)
 	}
 
-	var document = new Document(spy)
-
-	document.documentElement = new Element("HTML", null)
-	document.documentElement.appendChild(document.head = new Element("HEAD", null, document))
-	document.documentElement.appendChild(document.body = new Element("BODY", null, document))
-
-	var navState = new NavState(env)
-	var location = new Location(navState)
-	var history = new History(navState)
-
-	var delay = 16, last = 0
-	var $window = {
-		window: undefined,
-		requestAnimationFrame(callback) {
-			var elapsed = performance.now() - last
-			return setTimeout(() => {
-				last = performance.now()
-				try {
-					callback()
-				} catch (e) {
-					console.error(e)
-				}
-			}, delay - elapsed)
-		},
-		cancelAnimationFrame: clearTimeout,
-		document,
-		location,
-		history,
-		onpopstate: null,
-		onhashchange: null,
-		onunload: null,
-
-		addEventListener(name, handler) {
-			$window["on" + name] = handler
-		},
-
-		removeEventListener(name, handler) {
-			$window["on" + name] = handler
-		},
-
-		__getSpies: getSpies,
-		__registerSpies: registerSpies,
+	cancelAnimationFrame(id) {
+		clearTimeout(id)
 	}
-	$window.window = document.defaultView = navState.$window = $window
-	return $window
+
+	addEventListener(name, handler) {
+		this["on" + name] = handler
+	}
+
+	removeEventListener(name, handler) {
+		this["on" + name] = handler
+	}
+
+	__getSpies(element) {
+		if (element == null || typeof element !== "object") throw new Error("Element expected")
+		return this.__spyMap.get(element)
+	}
+}
+
+export default function browserMock(env = {}) {
+	return new Window(env)
 }
