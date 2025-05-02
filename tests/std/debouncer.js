@@ -2,55 +2,59 @@ import o from "ospec"
 
 import m from "../../src/entry/mithril.esm.js"
 
-o.spec("debouncer", () => {
+o.spec("limiter (debouncer)", () => {
 	function sleep(ms) {
 		return new Promise((resolve) => setTimeout(resolve, ms))
 	}
 
-	var debounced
+	var ctrl
 
-	o.afterEach(() => {
-		if (debounced) debounced.dispose()
+	o.beforeEach(() => {
+		ctrl = new AbortController()
 	})
 
-	o("validates create input", () => {
-		o(() => m.debouncer(NaN)).throws(RangeError)
-		o(() => m.debouncer(+1/0)).throws(RangeError)
-		o(() => m.debouncer(-1/0)).throws(RangeError)
-		o(() => m.debouncer("")).throws(RangeError)
-		o(() => m.debouncer("123")).throws(RangeError)
-		o(() => m.debouncer(true)).throws(RangeError)
-		o(() => m.debouncer(false)).throws(RangeError)
-		o(() => m.debouncer(null)).throws(RangeError)
-		o(() => m.debouncer([])).throws(RangeError)
-		o(() => m.debouncer({})).throws(RangeError)
-		o(() => m.debouncer(Symbol("wat"))).throws(RangeError)
-		m.debouncer()
-		m.debouncer(100)
+	o.afterEach(() => {
+		ctrl.abort()
+	})
+
+	o("coerces create input", () => {
+		m.limiter("debounce", NaN)
+		m.limiter("debounce", +1/0)
+		m.limiter("debounce", -1/0)
+		m.limiter("debounce", "")
+		m.limiter("debounce", "123")
+		m.limiter("debounce", true)
+		m.limiter("debounce", false)
+		m.limiter("debounce", null)
+		m.limiter("debounce", [])
+		m.limiter("debounce", {})
+		o(() => m.limiter("debounce", Symbol("wat"))).throws(TypeError)
+		m.limiter("debounce")
+		m.limiter("debounce", 100)
 	})
 
 	o("validates update input", () => {
-		debounced = m.debouncer()
+		var debounced = m.limiter("debounce", undefined, ctrl.signal)
 
-		o(() => debounced.update(NaN)).throws(RangeError)
-		o(() => debounced.update(+1/0)).throws(RangeError)
-		o(() => debounced.update(-1/0)).throws(RangeError)
-		o(() => debounced.update("")).throws(RangeError)
-		o(() => debounced.update("123")).throws(RangeError)
-		o(() => debounced.update(true)).throws(RangeError)
-		o(() => debounced.update(false)).throws(RangeError)
-		o(() => debounced.update(null)).throws(RangeError)
-		o(() => debounced.update([])).throws(RangeError)
-		o(() => debounced.update({})).throws(RangeError)
-		o(() => debounced.update(Symbol("wat"))).throws(RangeError)
-		o(() => debounced.update()).throws(RangeError)
+		debounced.update(NaN)
+		debounced.update(+1/0)
+		debounced.update(-1/0)
+		debounced.update("")
+		debounced.update("123")
+		debounced.update(true)
+		debounced.update(false)
+		debounced.update(null)
+		debounced.update([])
+		debounced.update({})
+		o(() => debounced.update(Symbol("wat"))).throws(TypeError)
+		debounced.update()
 		debounced.update(100)
 	})
 
 	o("detects edges correctly", async () => {
 		o.timeout(1000)
 
-		debounced = m.debouncer(100)
+		var debounced = m.limiter("debounce", 100, ctrl.signal)
 
 		var p1 = debounced()
 		var p2 = debounced()
@@ -58,22 +62,22 @@ o.spec("debouncer", () => {
 		var p3 = debounced()
 		await sleep(140)
 		var p4 = debounced()
-		o(await p1).equals(undefined)
-		o(await p2).equals(true)
-		o(await p3).equals(false)
-		o(await p4).equals(undefined)
+		o(await p1).equals("start")
+		o(await p2).equals("waiting")
+		o(await p3).equals("end")
+		o(await p4).equals("start")
 
 		var p5 = debounced()
 		await sleep(150)
 		var p6 = debounced()
-		o(await p5).equals(false)
-		o(await p6).equals(undefined)
+		o(await p5).equals("end")
+		o(await p6).equals("start")
 	})
 
 	o("resets the timer on early hit", async () => {
 		o.timeout(1000)
 
-		debounced = m.debouncer(100)
+		var debounced = m.limiter("debounce", 100, ctrl.signal)
 
 		var slept = false
 		setTimeout(() => { slept = true }, 125)
@@ -86,7 +90,7 @@ o.spec("debouncer", () => {
 	o("handles dynamic changes to higher delays", async () => {
 		o.timeout(1000)
 
-		debounced = m.debouncer(100)
+		var debounced = m.limiter("debounce", 100, ctrl.signal)
 
 		var p1 = debounced()
 		var p2 = debounced()
@@ -95,22 +99,22 @@ o.spec("debouncer", () => {
 		debounced.update(200)
 		await sleep(140)
 		var p4 = debounced()
-		o(await p1).equals(undefined)
-		o(await p2).equals(true)
-		o(await p3).equals(true)
-		o(await p4).equals(false)
+		o(await p1).equals("start")
+		o(await p2).equals("waiting")
+		o(await p3).equals("waiting")
+		o(await p4).equals("end")
 
 		var p5 = debounced()
 		await sleep(250)
 		var p6 = debounced()
-		o(await p5).equals(undefined)
-		o(await p6).equals(undefined)
+		o(await p5).equals("start")
+		o(await p6).equals("start")
 	})
 
 	o("handles dynamic changes to lower delays", async () => {
 		o.timeout(1000)
 
-		debounced = m.debouncer(100)
+		var debounced = m.limiter("debounce", 100, ctrl.signal)
 
 		var p1 = debounced()
 		var p2 = debounced()
@@ -119,22 +123,22 @@ o.spec("debouncer", () => {
 		debounced.update(50)
 		await sleep(100)
 		var p4 = debounced()
-		o(await p1).equals(undefined)
-		o(await p2).equals(true)
-		o(await p3).equals(false)
-		o(await p4).equals(undefined)
+		o(await p1).equals("start")
+		o(await p2).equals("waiting")
+		o(await p3).equals("end")
+		o(await p4).equals("start")
 
 		var p5 = debounced()
 		await sleep(100)
 		var p6 = debounced()
-		o(await p5).equals(false)
-		o(await p6).equals(undefined)
+		o(await p5).equals("end")
+		o(await p6).equals("start")
 	})
 
 	o("handles same-duration changes", async () => {
 		o.timeout(1000)
 
-		debounced = m.debouncer(100)
+		var debounced = m.limiter("debounce", 100, ctrl.signal)
 
 		var p1 = debounced()
 		debounced.update(100)
@@ -148,13 +152,13 @@ o.spec("debouncer", () => {
 		debounced.update(100)
 		var p4 = debounced()
 		debounced.update(100)
-		o(await p1).equals(undefined)
+		o(await p1).equals("start")
 		debounced.update(100)
-		o(await p2).equals(true)
+		o(await p2).equals("waiting")
 		debounced.update(100)
-		o(await p3).equals(false)
+		o(await p3).equals("end")
 		debounced.update(100)
-		o(await p4).equals(undefined)
+		o(await p4).equals("start")
 		debounced.update(100)
 
 		var p5 = debounced()
@@ -163,8 +167,8 @@ o.spec("debouncer", () => {
 		debounced.update(100)
 		var p6 = debounced()
 		debounced.update(100)
-		o(await p5).equals(false)
+		o(await p5).equals("end")
 		debounced.update(100)
-		o(await p6).equals(undefined)
+		o(await p6).equals("start")
 	})
 })
