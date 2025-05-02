@@ -367,11 +367,31 @@ m.run = run
 m.with = with_
 m.wrap = wrap
 
+/** @param {AbortSignal} [value] */
+m.signal = function(value) {
+	if (arguments.length) {
+		// eslint-disable-next-line no-undef
+		if (value != null && !(value instanceof AbortSignal)) throw new TypeError("Only abort signals")
+		return Reflect.apply(signalRaw, this, arguments)
+	} else {
+		var inner = signalRaw()
+		if (inner !== currentComponent) return inner
+		var vnode = currentComponent()
+		var ctrl = vnodeCtrls.get(vnode)
+		if (ctrl == null) vnodeCtrls.set(inner, ctrl = new AbortController())
+		return ctrl.signal
+	}
+}
+
 var resolveSpecialFragment = (type, attrs, ...children) => {
 	var resolved = children.length === 1 && Array.isArray(children[0]) ? [...children[0]] : [...children]
 	for (var i = 0; i < resolved.length; i++) resolved[i] = m.normalize(resolved[i])
 	return Vnode(type, null, attrs, resolved)
 }
+
+var signalRaw = m.dyn()
+var currentComponent = m.dyn()
+var vnodeCtrls = new WeakMap()
 
 var xlinkNs = "http://www.w3.org/1999/xlink"
 var htmlNs = "http://www.w3.org/1999/xhtml"
@@ -746,21 +766,34 @@ var updateElement = (old, vnode) => {
 	currentRefNode = element
 }
 
+var executeComponent = (vnode, old) => {
+	var attrs = vnode.a
+	var tree, oldInstance, oldAttrs
+	rendered: {
+		if (old != null) {
+			tree = old.s
+			oldInstance = old.c
+			oldAttrs = old.a
+		} else if (typeof (tree = signalRaw.call(
+			currentContext, currentComponent,
+			currentComponent, vnode,
+			vnode.s = vnode.t,
+			attrs, oldAttrs
+		)) !== "function") {
+			break rendered
+		}
+		tree = (vnode.s = tree).call(currentContext, attrs, oldAttrs)
+	}
+	updateNode(oldInstance, vnode.c = m.normalize(tree))
+}
+
 var updateComponent = (old, vnode) => {
 	try {
-		var attrs = vnode.a
-		var tree, oldInstance, oldAttrs
-		rendered: {
-			if (old != null) {
-				tree = old.s
-				oldInstance = old.c
-				oldAttrs = old.a
-			} else if (typeof (tree = (vnode.s = vnode.t).call(currentContext, attrs, oldAttrs)) !== "function") {
-				break rendered
-			}
-			tree = (vnode.s = tree).call(currentContext, attrs, oldAttrs)
-		}
-		updateNode(oldInstance, vnode.c = m.normalize(tree))
+		signalRaw.call(
+			currentContext, currentComponent,
+			currentComponent, vnode,
+			executeComponent, vnode, old
+		)
 	} catch (e) {
 		if (currentRemoveOnThrow) throw e
 		console.error(e)
@@ -795,7 +828,11 @@ var removeElement = (old) => {
 	updateFragment(old, null)
 }
 
-var removeInstance = (old) => updateNode(old.c, null)
+var removeInstance = (old) => {
+	var ctrl = vnodeCtrls.get(old)
+	if (vnodeCtrls.delete(old)) ctrl.abort()
+	updateNode(old.c, null)
+}
 
 // Replaces an otherwise necessary `switch`.
 var updateNodeDispatch = [

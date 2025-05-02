@@ -14,7 +14,7 @@ import m from "../core.js"
  * @returns {boolean}
  * `true` if the sleep completed, `false` if it was aborted first.
  */
-var sleep = (ms, signal) => new Promise((resolve) => {
+var sleep = (ms, signal = m.signal()) => new Promise((resolve) => {
 	if (!signal) {
 		// eslint-disable-next-line no-bitwise
 		setTimeout(resolve, ms | 0, true)
@@ -52,7 +52,7 @@ var sleep = (ms, signal) => new Promise((resolve) => {
  * @returns {Promise<void>}
  * Resolves once the signal aborts.
  */
-var interval = async (ms, callback, signal) => {
+var interval = async (ms, callback, signal = m.signal()) => {
 	// eslint-disable-next-line no-bitwise
 	ms |= 0
 	if (ms < 0) ms = 0

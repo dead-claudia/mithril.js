@@ -1,5 +1,6 @@
 /* global performance, setTimeout, clearTimeout */
 
+import m from "../entry/mithril.esm.js"
 import {noop} from "../util.js"
 
 /**
@@ -108,7 +109,7 @@ import {noop} from "../util.js"
  * @param {AbortSignal} [signal]
  * @returns {Limiter}
  */
-var limiter = (mode, delay = 500, signal) => {
+var limiter = (mode, delay = 500, signal = m.signal()) => {
 	if (mode !== "throttle" && mode !== "debounce") {
 		throw new TypeError("Mode must only be throttle or debounce")
 	}
