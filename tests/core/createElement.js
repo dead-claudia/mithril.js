@@ -32,20 +32,20 @@ o.spec("createElement", function() {
 		var vnode = m("div", {style: {"--css-var": "red"}})
 		m.render(G.root, vnode)
 
-		o(vnode.d.style["--css-var"]).equals("red")
+		o(vnode.d.style.getPropertyValue("--css-var")).equals("red")
 	})
 	o("allows css vars in style with uppercase letters", function() {
 		var vnode = m("div", {style: {"--cssVar": "red"}})
 		m.render(G.root, vnode)
 
-		o(vnode.d.style["--cssVar"]).equals("red")
+		o(vnode.d.style.getPropertyValue("--cssVar")).equals("red")
 	})
 	o("censors cssFloat to float", function() {
 		var vnode = m("a", {style: {cssFloat: "left"}})
 
 		m.render(G.root, vnode)
 
-		o(vnode.d.style.float).equals("left")
+		o(vnode.d.style.getPropertyValue("float")).equals("left")
 	})
 	o("creates children", function() {
 		var vnode = m("div", m("a"), m("b"))
@@ -82,7 +82,7 @@ o.spec("createElement", function() {
 		o(vnode.d.firstChild.attributes["href"].value).equals("javascript:;")
 		o(vnode.d.firstChild.attributes["href"].namespaceURI).equals("http://www.w3.org/1999/xlink")
 		o(vnode.d.childNodes[1].nodeName).equals("foreignObject")
-		o(vnode.d.childNodes[1].firstChild.nodeName).equals("body")
+		o(vnode.d.childNodes[1].firstChild.nodeName).equals("BODY")
 		o(vnode.d.childNodes[1].firstChild.namespaceURI).equals("http://www.w3.org/1999/xhtml")
 	})
 	/* eslint-enable no-script-url */

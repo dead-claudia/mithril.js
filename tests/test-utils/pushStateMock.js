@@ -4,7 +4,7 @@ import {callAsync, waitAsync} from "../../test-utils/callAsync.js"
 import {setupGlobals} from "../../test-utils/global.js"
 
 o.spec("pushStateMock", function() {
-	var G = setupGlobals()
+	var G = setupGlobals({expectNoConsoleError: true})
 
 	o.spec("initial state", function() {
 		o("has url on page load", function() {
@@ -624,74 +624,6 @@ o.spec("pushStateMock", function() {
 					done()
 				})
 			})
-		})
-	})
-	o.spec("onunload", function() {
-		o("onunload triggers on location.href change", function() {
-			G.window.onunload = o.spy()
-			G.window.location.href = "http://localhost/a"
-
-			o(G.window.onunload.callCount).equals(1)
-			o(G.window.onunload.args[0].type).equals("unload")
-		})
-		o("onunload triggers on relative location.href change", function() {
-			G.window.onunload = o.spy()
-			G.window.location.href = "a"
-
-			o(G.window.onunload.callCount).equals(1)
-		})
-		o("onunload triggers on search change via location.href", function() {
-			G.window.onunload = o.spy()
-			G.window.location.href = "http://localhost/?a"
-
-			o(G.window.onunload.callCount).equals(1)
-		})
-		o("onunload triggers on relative search change via location.href", function() {
-			G.window.onunload = o.spy()
-			G.window.location.href = "?a"
-
-			o(G.window.onunload.callCount).equals(1)
-		})
-		o("onunload does not trigger on hash change via location.href", function() {
-			G.window.onunload = o.spy()
-			G.window.location.href = "http://localhost/#a"
-
-			o(G.window.onunload.callCount).equals(0)
-		})
-		o("onunload does not trigger on relative hash change via location.href", function() {
-			G.window.onunload = o.spy()
-			G.window.location.href = "#a"
-
-			o(G.window.onunload.callCount).equals(0)
-		})
-		o("onunload does not trigger on hash-only history.back()", function() {
-			G.window.location.href = "#a"
-			G.window.onunload = o.spy()
-			G.window.history.back()
-
-			o(G.window.onunload.callCount).equals(0)
-		})
-		o("onunload does not trigger on hash-only history.forward()", function() {
-			G.window.location.href = "#a"
-			G.window.history.back()
-			G.window.onunload = o.spy()
-			G.window.history.forward()
-
-			o(G.window.onunload.callCount).equals(0)
-		})
-		o("onunload has correct url during call via location.href change", function(done) {
-			G.window.onunload = function() {
-				o(G.window.location.href).equals("http://localhost/")
-				done()
-			}
-			G.window.location.href = "a"
-		})
-		o("onunload has correct url during call via location.search change", function(done) {
-			G.window.onunload = function() {
-				o(G.window.location.href).equals("http://localhost/")
-				done()
-			}
-			G.window.location.search = "?a"
 		})
 	})
 })

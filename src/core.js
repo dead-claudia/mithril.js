@@ -1080,24 +1080,24 @@ var getStyleKey = (host, key) => {
 
 var setStyle = (style, old, value, add) => {
 	for (var propName in value) {
-		var preferSetter = propName.charCodeAt(0) === ASCII_HYPHEN
+		var preferMethod = propName.includes("-")
 		var propValue = getStyleKey(value, propName)
 		if (propValue !== null) {
 			var oldValue = getStyleKey(old, propName)
 			if (add) {
 				if (propValue !== oldValue) {
-					if (preferSetter) {
-						style[propName] = propValue
-					} else {
+					if (preferMethod) {
 						style.setProperty(propName, propValue)
+					} else {
+						style[propName] = propValue
 					}
 				}
 			} else {
 				if (oldValue === null) {
-					if (preferSetter) {
-						style[propName] = ""
-					} else {
+					if (preferMethod) {
 						style.removeProperty(propName)
+					} else {
+						style[propName] = ""
 					}
 				}
 			}
@@ -1142,9 +1142,7 @@ var setAttr = (vnode, element, mask, key, old, attrs) => {
 					if (key.length > 1) {
 						var pair1 = key.charCodeAt(0) | key.charCodeAt(1) << 16
 
-						if (key.length === 2 && pair1 === (ASCII_LOWER_I | ASCII_LOWER_S << 16)) {
-							return
-						} else if (pair1 === (ASCII_LOWER_O | ASCII_LOWER_N << 16)) {
+						if (pair1 === (ASCII_LOWER_O | ASCII_LOWER_N << 16)) {
 							if (newValue === oldValue) return
 							// Update the event
 							if (typeof newValue === "function") {
@@ -1160,6 +1158,13 @@ var setAttr = (vnode, element, mask, key, old, attrs) => {
 								vnode.s.delete(key)
 							}
 							return
+						} else if (key.length === 2) {
+							if (pair1 === (ASCII_LOWER_I | ASCII_LOWER_S << 16)) return
+							// Handle this like `class`es and `title`s
+							if (pair1 === (ASCII_LOWER_I | ASCII_LOWER_D << 16)) {
+								if (newValue === null) break forceSetAttribute
+								break forceTryProperty
+							}
 						} else if (key.length > 3) {
 							var pair2 = key.charCodeAt(2) | key.charCodeAt(3) << 16
 							if (

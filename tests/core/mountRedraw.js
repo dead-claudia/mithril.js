@@ -358,13 +358,9 @@ o.spec("mount/redraw", function() {
 	})
 
 	o("redraws on events", function() {
-		var $document = G.window.document
-
 		var layout = o.spy()
 		var onclick = o.spy()
-		var e = $document.createEvent("MouseEvents")
-
-		e.initEvent("click", true, true)
+		var e = new G.window.TouchEvent("click", {bubbles: true, cancelable: true})
 
 		m.mount(G.root, () => m("div", {
 			onclick: onclick,
@@ -397,9 +393,7 @@ o.spec("mount/redraw", function() {
 
 		var root1 = G.register($document.createElement("div"))
 		var root2 = G.register($document.createElement("div"))
-		var e = $document.createEvent("MouseEvents")
-
-		e.initEvent("click", true, true)
+		var e = new G.window.TouchEvent("click", {bubbles: true, cancelable: true})
 
 		m.mount(root1, () => m("div", {
 			onclick: onclick0,
@@ -437,12 +431,8 @@ o.spec("mount/redraw", function() {
 	})
 
 	o("event handlers can skip redraw", function() {
-		var $document = G.window.document
-
 		var layout = o.spy()
-		var e = $document.createEvent("MouseEvents")
-
-		e.initEvent("click", true, true)
+		var e = new G.window.TouchEvent("click", {bubbles: true, cancelable: true})
 
 		m.mount(G.root, () => m("div", {
 			onclick: () => "skip-redraw",

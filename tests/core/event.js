@@ -29,8 +29,7 @@ o.spec("event", function() {
 		var spyParent = eventSpy()
 		var div = m("div", {onclick: spyDiv})
 		var parent = m("div", {onclick: spyParent}, div)
-		var e = G.window.document.createEvent("MouseEvents")
-		e.initEvent("click", true, true)
+		var e = new G.window.TouchEvent("click", {bubbles: true, cancelable: true})
 
 		render(G.root, parent)
 		div.d.dispatchEvent(e)
@@ -57,8 +56,7 @@ o.spec("event", function() {
 		var spyParent = eventSpy()
 		var div = m("div", {onclick: spyDiv})
 		var parent = m("div", {onclick: spyParent}, div)
-		var e = G.window.document.createEvent("MouseEvents")
-		e.initEvent("click", true, true)
+		var e = new G.window.TouchEvent("click", {bubbles: true, cancelable: true})
 
 		render(G.root, parent)
 		div.d.dispatchEvent(e)
@@ -90,8 +88,7 @@ o.spec("event", function() {
 		var spyParent = eventSpy()
 		var div = m("div", {onclick: spyDiv})
 		var parent = m("div", {onclick: spyParent}, div)
-		var e = G.window.document.createEvent("MouseEvents")
-		e.initEvent("click", true, true)
+		var e = new G.window.TouchEvent("click", {bubbles: true, cancelable: true})
 
 		render(G.root, parent)
 		div.d.dispatchEvent(e)
@@ -112,8 +109,7 @@ o.spec("event", function() {
 		var spyParent = eventSpy()
 		var div = m("div", {onclick: spyDiv})
 		var parent = m("div", {onclick: spyParent}, div)
-		var e = G.window.document.createEvent("MouseEvents")
-		e.initEvent("click", true, true)
+		var e = new G.window.TouchEvent("click", {bubbles: true, cancelable: true})
 
 		render(G.root, parent)
 		div.d.dispatchEvent(e)
@@ -137,8 +133,7 @@ o.spec("event", function() {
 		var spyParent = eventSpy()
 		var div = m("div", {onclick: spyDiv})
 		var parent = m("div", {onclick: spyParent}, div)
-		var e = G.window.document.createEvent("MouseEvents")
-		e.initEvent("click", true, true)
+		var e = new G.window.TouchEvent("click", {bubbles: true, cancelable: true})
 
 		render(G.root, parent)
 		div.d.dispatchEvent(e)
@@ -161,8 +156,7 @@ o.spec("event", function() {
 		render(G.root, vnode)
 		render(G.root, updated)
 
-		var e = G.window.document.createEvent("MouseEvents")
-		e.initEvent("click", true, true)
+		var e = new G.window.TouchEvent("click", {bubbles: true, cancelable: true})
 		vnode.d.dispatchEvent(e)
 
 		o(spy.callCount).equals(0)
@@ -176,8 +170,7 @@ o.spec("event", function() {
 		render(G.root, vnode)
 		render(G.root, updated)
 
-		var e = G.window.document.createEvent("MouseEvents")
-		e.initEvent("click", true, true)
+		var e = new G.window.TouchEvent("click", {bubbles: true, cancelable: true})
 		vnode.d.dispatchEvent(e)
 
 		o(spy.callCount).equals(0)
@@ -191,8 +184,7 @@ o.spec("event", function() {
 		render(G.root, vnode)
 		render(G.root, updated)
 
-		var e = G.window.document.createEvent("MouseEvents")
-		e.initEvent("click", true, true)
+		var e = new G.window.TouchEvent("click", {bubbles: true, cancelable: true})
 		vnode.d.dispatchEvent(e)
 
 		o(spy.callCount).equals(0)
@@ -206,9 +198,7 @@ o.spec("event", function() {
 		render(G.root, vnode)
 		render(G.root, updated)
 
-		var e = G.window.document.createEvent("TouchEvents")
-		e.initEvent("touchstart", true, true)
-		vnode.d.dispatchEvent(e)
+		vnode.d.dispatchEvent(new G.window.TouchEvent("touchstart", {bubbles: true, cancelable: true}))
 
 		o(spy.callCount).equals(0)
 	})
@@ -221,8 +211,7 @@ o.spec("event", function() {
 		render(G.root, vnode)
 		render(G.root, updated)
 
-		var e = G.window.document.createEvent("TouchEvents")
-		e.initEvent("touchstart", true, true)
+		var e = new G.window.TouchEvent("touchstart", {bubbles: true, cancelable: true})
 		vnode.d.dispatchEvent(e)
 
 		o(spy.callCount).equals(0)
@@ -236,8 +225,7 @@ o.spec("event", function() {
 		render(G.root, vnode)
 		render(G.root, updated)
 
-		var e = G.window.document.createEvent("TouchEvents")
-		e.initEvent("touchstart", true, true)
+		var e = new G.window.TouchEvent("touchstart", {bubbles: true, cancelable: true})
 		vnode.d.dispatchEvent(e)
 
 		o(spy.callCount).equals(0)
@@ -247,8 +235,7 @@ o.spec("event", function() {
 		var spy = o.spy()
 		var div = m("div", {id: "a", onclick: spy})
 		var updated = m("div", {id: "b", onclick: spy})
-		var e = G.window.document.createEvent("MouseEvents")
-		e.initEvent("click", true, true)
+		var e = new G.window.TouchEvent("click", {bubbles: true, cancelable: true})
 
 		render(G.root, div)
 		render(G.root, updated)
@@ -268,8 +255,10 @@ o.spec("event", function() {
 	o("handles ontransitionend", function() {
 		var spy = o.spy()
 		var div = m("div", {ontransitionend: spy})
-		var e = G.window.document.createEvent("HTMLEvents")
-		e.initEvent("transitionend", true, true)
+		// FIXME: Supposed to be `TransitionEvent`, but JSDOM only just implemented it and hasn't
+		// released it yet in a stable version.
+		// https://github.com/jsdom/jsdom/commit/9c2414bfec5dc4887396a7f643b16a3b354f36d6
+		var e = new G.window.Event("transitionend", {bubbles: true, cancelable: true})
 
 		render(G.root, div)
 		div.d.dispatchEvent(e)
@@ -287,8 +276,10 @@ o.spec("event", function() {
 		var div1 = m("div", {ontransitionend: function() {}})
 
 		m.render(G.root, [div1], {redraw})
-		var e = G.window.document.createEvent("HTMLEvents")
-		e.initEvent("transitionend", true, true)
+		// FIXME: Supposed to be `TransitionEvent`, but JSDOM only just implemented it and hasn't
+		// released it yet in a stable version.
+		// https://github.com/jsdom/jsdom/commit/9c2414bfec5dc4887396a7f643b16a3b354f36d6
+		var e = new G.window.Event("transitionend", {bubbles: true, cancelable: true})
 		div1.d.dispatchEvent(e)
 
 		o(redraw.callCount).equals(1)
@@ -299,8 +290,10 @@ o.spec("event", function() {
 		var div2 = m("div", {ontransitionend: function() {}})
 
 		m.render(G.root, [div2], {redraw: replacementRedraw})
-		var e = G.window.document.createEvent("HTMLEvents")
-		e.initEvent("transitionend", true, true)
+		// FIXME: Supposed to be `TransitionEvent`, but JSDOM only just implemented it and hasn't
+		// released it yet in a stable version.
+		// https://github.com/jsdom/jsdom/commit/9c2414bfec5dc4887396a7f643b16a3b354f36d6
+		var e = new G.window.Event("transitionend", {bubbles: true, cancelable: true})
 		div2.d.dispatchEvent(e)
 
 		o(redraw.callCount).equals(1)

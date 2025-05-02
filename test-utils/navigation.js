@@ -51,27 +51,20 @@ class NavState {
 		if (this.hashchangePending) return
 		callAsync(() => {
 			this.hashchangePending = false
-			if (typeof this.$window.onhashchange === "function") {
-				this.$window.onhashchange({type: "hashchange"})
-			}
+			this.$window.dispatchEvent(new this.$window.HashChangeEvent("hashchange"))
 		})
 		this.hashchangePending = true
 	}
 
 	popstate() {
-		if (typeof this.$window.onpopstate === "function") {
-			this.$window.onpopstate({type: "popstate", state: this.$window.history.state})
-		}
-	}
-
-	unload() {
-		if (typeof this.$window.onunload === "function") {
-			this.$window.onunload({type: "unload"})
-		}
+		this.$window.dispatchEvent(new this.$window.PopStateEvent("popstate", {
+			state: this.$window.history.state,
+		}))
 	}
 }
 
 class Location {
+	/** @param {NavState} navState */
 	constructor(navState) {
 		this._ = navState
 	}
@@ -110,27 +103,23 @@ class Location {
 		throw new Error("Protocol is read-only")
 	}
 	set hostname(value) {
-		this._.unload()
 		this._.past.push({url: this._.getURL(), isNew: true})
 		this._.future = []
 		this._.hostname = value
 	}
 	set port(value) {
 		if (this._.protocol === "file:") throw new Error("Port is read-only under `file://` protocol")
-		this._.unload()
 		this._.past.push({url: this._.getURL(), isNew: true})
 		this._.future = []
 		this._.port = value
 	}
 	set pathname(value) {
 		if (this._.protocol === "file:") throw new Error("Pathname is read-only under `file://` protocol")
-		this._.unload()
 		this._.past.push({url: this._.getURL(), isNew: true})
 		this._.future = []
 		this._.pathname = prefix("/", value)
 	}
 	set search(value) {
-		this._.unload()
 		this._.past.push({url: this._.getURL(), isNew: true})
 		this._.future = []
 		this._.search = prefix("?", value)
@@ -154,7 +143,6 @@ class Location {
 		var isNew = this._.setURL(value)
 		if (isNew) {
 			this._.setURL(url)
-			this._.unload()
 			this._.setURL(value)
 		}
 		this._.past.push({url: url, isNew: isNew})
@@ -163,6 +151,7 @@ class Location {
 }
 
 class History {
+	/** @param {NavState} navState */
 	constructor(navState) {
 		this._ = navState
 	}
@@ -181,7 +170,6 @@ class History {
 	back() {
 		if (this._.past.length > 1) {
 			var entry = this._.past.pop()
-			if (entry.isNew) this._.unload()
 			this._.future.push({url: this._.getURL(), isNew: false, state: entry.state, title: entry.title})
 			this._.setURL(entry.url)
 			if (!entry.isNew) this._.popstate()
@@ -190,7 +178,6 @@ class History {
 	forward() {
 		var entry = this._.future.pop()
 		if (entry != null) {
-			if (entry.isNew) this._.unload()
 			this._.past.push({url: this._.getURL(), isNew: false, state: entry.state, title: entry.title})
 			this._.setURL(entry.url)
 			if (!entry.isNew) this._.popstate()
@@ -201,28 +188,10 @@ class History {
 	}
 }
 
-export function installNavMock(window, env = {}) {
-	var prevLocation = Object.getOwnPropertyDescriptor(window, "location")
-	var prevHistory = Object.getOwnPropertyDescriptor(window, "history")
-
+export function createLocationProxy(window, env = {}) {
 	var navState = new NavState(window, env)
-
-	Object.defineProperty(window, "location", {
-		configurable: true,
-		enumerable: true,
-		writable: true,
-		value: new Location(navState),
-	})
-
-	Object.defineProperty(window, "history", {
-		configurable: true,
-		enumerable: true,
-		writable: true,
-		value: new History(navState),
-	})
-
-	return () => {
-		Object.defineProperty(window, "location", prevLocation)
-		Object.defineProperty(window, "history", prevHistory)
+	return {
+		location: new Location(navState),
+		history: new History(navState),
 	}
 }

@@ -5,6 +5,7 @@ import o from "ospec"
 import {callAsync, clearPending, waitAsync} from "../../test-utils/callAsync.js"
 
 o.spec("callAsync", function() {
+	o.afterEach(clearPending)
 	o("gets called before setTimeout", function(done) {
 		var timeout
 		callAsync(function() {
@@ -12,7 +13,7 @@ o.spec("callAsync", function() {
 			done()
 		})
 		timeout = setTimeout(function() {
-			throw new Error("callAsync was called too slow")
+			done(new Error("callAsync was called too slow"))
 		}, 5)
 	})
 	o("gets cleared", function(done) {
@@ -26,6 +27,7 @@ o.spec("callAsync", function() {
 })
 
 o.spec("waitAsync", function() {
+	o.afterEach(clearPending)
 	function sleep(ms) {
 		return new Promise((resolve) => setTimeout(resolve, ms))
 	}

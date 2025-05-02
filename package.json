@@ -36,7 +36,7 @@
     "build": "node scripts/build.js",
     "lint": "eslint . --cache",
     "pretest": "npm run lint",
-    "test": "ospec"
+    "test": "ospec --preload test-utils/nodeSetup.js"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.0",

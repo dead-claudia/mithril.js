@@ -1,6 +1,5 @@
 import o from "ospec"
 
-import {installNavMock} from "../../test-utils/navigation.js"
 import {setupGlobals} from "../../test-utils/global.js"
 
 import m from "../../src/entry/mithril.esm.js"
@@ -12,16 +11,7 @@ o.spec("route", () => {
 				var fullHost = `${env.protocol}//${env.hostname === "/" ? "" : env.hostname}`
 				var fullPrefix = `${fullHost}${prefix[0] === "/" ? "" : "/"}${prefix ? `${prefix}/` : ""}`
 
-				var uninstall
-				var G = setupGlobals({
-					expectNoConsoleError: true,
-					initialize(G) {
-						uninstall = installNavMock(G.window, env)
-					},
-					cleanup() {
-						uninstall()
-					},
-				})
+				var G = setupGlobals({...env, expectNoConsoleError: true})
 
 				o("returns the right route on init", () => {
 					G.window.location.href = `${prefix}/`
@@ -130,7 +120,7 @@ o.spec("route", () => {
 					G.rafMock.fire()
 
 					G.window.history.pushState(null, null, `${prefix}/other/x/y/z?c=d#e=f`)
-					G.window.onpopstate()
+					G.window.dispatchEvent(new G.window.PopStateEvent("popstate"))
 
 					await Promise.resolve()
 					G.rafMock.fire()
@@ -172,11 +162,6 @@ o.spec("route", () => {
 				o("`replace: true` works in links", async () => {
 					G.window.location.href = `${prefix}/test`
 
-					var e = G.window.document.createEvent("MouseEvents")
-
-					e.initEvent("click", true, true)
-					e.button = 0
-
 					var App = function () {
 						if (this.route.path === "/test") {
 							return m("a", m.link("/other", {replace: true}))
@@ -191,7 +176,12 @@ o.spec("route", () => {
 
 					m.mount(G.root, () => m.route(prefix, App))
 
-					G.root.firstChild.dispatchEvent(e)
+					G.root.firstChild.dispatchEvent(new G.window.MouseEvent("click", {
+						button: 0,
+						buttons: 1,
+						cancelable: true,
+						bubbles: true,
+					}))
 
 					await Promise.resolve()
 					G.rafMock.fire()
@@ -234,11 +224,6 @@ o.spec("route", () => {
 				o("`replace: false` works in links", async () => {
 					G.window.location.href = `${prefix}/test`
 
-					var e = G.window.document.createEvent("MouseEvents")
-
-					e.initEvent("click", true, true)
-					e.button = 0
-
 					var App = function () {
 						if (this.route.path === "/test") {
 							return m("a", m.link("/other", {replace: false}))
@@ -251,7 +236,12 @@ o.spec("route", () => {
 
 					m.mount(G.root, () => m.route(prefix, App))
 
-					G.root.firstChild.dispatchEvent(e)
+					G.root.firstChild.dispatchEvent(new G.window.MouseEvent("click", {
+						button: 0,
+						buttons: 1,
+						cancelable: true,
+						bubbles: true,
+					}))
 
 					await Promise.resolve()
 					G.rafMock.fire()
@@ -331,11 +321,6 @@ o.spec("route", () => {
 				})
 
 				o("changes location on route.Link", async () => {
-					var e = G.window.document.createEvent("MouseEvents")
-
-					e.initEvent("click", true, true)
-					e.button = 0
-
 					G.window.location.href = `${prefix}/`
 
 					var App = function () {
@@ -352,7 +337,12 @@ o.spec("route", () => {
 
 					o(G.window.location.href).equals(fullPrefix)
 
-					G.root.firstChild.dispatchEvent(e)
+					G.root.firstChild.dispatchEvent(new G.window.MouseEvent("click", {
+						button: 0,
+						buttons: 1,
+						cancelable: true,
+						bubbles: true,
+					}))
 
 					await Promise.resolve()
 					G.rafMock.fire()
@@ -362,10 +352,6 @@ o.spec("route", () => {
 				})
 
 				o("passes state on route.Link", async () => {
-					var e = G.window.document.createEvent("MouseEvents")
-
-					e.initEvent("click", true, true)
-					e.button = 0
 					G.window.location.href = `${prefix}/`
 
 					var App = function () {
@@ -380,7 +366,12 @@ o.spec("route", () => {
 
 					m.mount(G.root, () => m.route(prefix, App))
 
-					G.root.firstChild.dispatchEvent(e)
+					G.root.firstChild.dispatchEvent(new G.window.MouseEvent("click", {
+						button: 0,
+						buttons: 1,
+						cancelable: true,
+						bubbles: true,
+					}))
 
 					await Promise.resolve()
 					G.rafMock.fire()
@@ -390,11 +381,6 @@ o.spec("route", () => {
 				})
 
 				o("route.Link doesn't redraw on wrong button", async () => {
-					var e = G.window.document.createEvent("MouseEvents")
-
-					e.initEvent("click", true, true)
-					e.button = 10
-
 					G.window.location.href = `${prefix}/`
 
 					var App = function () {
@@ -411,7 +397,12 @@ o.spec("route", () => {
 
 					o(G.window.location.href).equals(fullPrefix)
 
-					G.root.firstChild.dispatchEvent(e)
+					G.root.firstChild.dispatchEvent(new G.window.MouseEvent("click", {
+						button: 2,
+						buttons: 4,
+						cancelable: true,
+						bubbles: true,
+					}))
 
 					await Promise.resolve()
 					G.rafMock.fire()
@@ -421,11 +412,6 @@ o.spec("route", () => {
 				})
 
 				o("route.Link doesn't redraw on preventDefault", async () => {
-					var e = G.window.document.createEvent("MouseEvents")
-
-					e.initEvent("click", true, true)
-					e.button = 0
-
 					G.window.location.href = `${prefix}/`
 
 					var App = function () {
@@ -442,7 +428,12 @@ o.spec("route", () => {
 
 					o(G.window.location.href).equals(fullPrefix)
 
-					G.root.firstChild.dispatchEvent(e)
+					G.root.firstChild.dispatchEvent(new G.window.MouseEvent("click", {
+						button: 0,
+						buttons: 1,
+						cancelable: true,
+						bubbles: true,
+					}))
 
 					await Promise.resolve()
 					G.rafMock.fire()

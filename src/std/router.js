@@ -102,7 +102,7 @@ var Link = () => {
 			// Skip if `onclick` prevented default
 			!ev.defaultPrevented &&
 			// Ignore everything but left clicks
-			(ev.button === 0 || ev.which === 0 || ev.which === 1) &&
+			ev.button === 0 &&
 			// Let the browser handle `target=_blank`, etc.
 			(!ev.currentTarget.target || ev.currentTarget.target === "_self") &&
 			// No modifier keys

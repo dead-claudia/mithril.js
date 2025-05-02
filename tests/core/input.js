@@ -37,8 +37,7 @@ o.spec("form inputs", function() {
 			m.render(G.root, input, {redraw})
 
 			//simulate user typing
-			var e = G.window.document.createEvent("KeyboardEvent")
-			e.initEvent("input", true, true)
+			var e = new G.window.KeyboardEvent("input", {bubbles: true, cancelable: true})
 			input.d.focus()
 			input.d.value += "a"
 			input.d.dispatchEvent(e)
@@ -69,8 +68,7 @@ o.spec("form inputs", function() {
 			m.render(G.root, input, {redraw})
 
 			//simulate user clicking checkbox
-			var e = G.window.document.createEvent("MouseEvents")
-			e.initEvent("click", true, true)
+			var e = new G.window.TouchEvent("click", {bubbles: true, cancelable: true})
 			input.d.focus()
 			input.d.dispatchEvent(e)
 			o(redraw.callCount).equals(1)
@@ -82,15 +80,40 @@ o.spec("form inputs", function() {
 			o(redraw.callCount).equals(1)
 		})
 
+		// Hack to "set" the value without actually setting it in the DOM
+		function createInputFileHijacker() {
+			var desc = Object.getOwnPropertyDescriptor(G.window.HTMLInputElement.prototype, "value")
+			var inputHijacked = false
+			var targetInput, targetValue
+			Object.defineProperty(G.window.HTMLInputElement.prototype, "value", {
+				get() {
+					if (inputHijacked && this === targetInput) return targetValue
+					return desc.get.call(this)
+				},
+				set(value) {
+					if (inputHijacked && this === targetInput) {
+						targetValue = `${value}`
+					} else {
+						desc.set.call(this, value)
+					}
+				}
+			})
+			return (input, value) => {
+				inputHijacked = true
+				targetInput = input
+				targetValue = `${value}`
+			}
+		}
+
 		o("syncs file input value attribute if DOM value differs from vdom value and is empty", function() {
+			var hijackFileInput = createInputFileHijacker()
 			var input = m("input", {type: "file", value: "", onclick: function() {}})
 			var updated = m("input", {type: "file", value: "", onclick: function() {}})
 			var spy = o.spy()
 			var error = console.error
 
 			m.render(G.root, input)
-
-			input.d.value = "test.png"
+			hijackFileInput(G.root.firstChild, "test.png")
 
 			try {
 				console.error = spy
@@ -104,14 +127,14 @@ o.spec("form inputs", function() {
 		})
 
 		o("warns and ignores file input value attribute if DOM value differs from vdom value and is non-empty", function() {
+			var hijackFileInput = createInputFileHijacker()
 			var input = m("input", {type: "file", value: "", onclick: function() {}})
 			var updated = m("input", {type: "file", value: "other.png", onclick: function() {}})
 			var spy = o.spy()
 			var error = console.error
 
 			m.render(G.root, input)
-
-			input.d.value = "test.png"
+			hijackFileInput(G.root.firstChild, "test.png")
 
 			try {
 				console.error = spy
@@ -125,6 +148,7 @@ o.spec("form inputs", function() {
 		})
 
 		o("retains file input value attribute if DOM value is the same as vdom value and is non-empty", function() {
+			var hijackFileInput = createInputFileHijacker()
 			var input = m("input", {type: "file", value: "", onclick: function() {}})
 			var updated1 = m("input", {type: "file", value: "test.png", onclick: function() {}})
 			var updated2 = m("input", {type: "file", value: "test.png", onclick: function() {}})
@@ -135,6 +159,8 @@ o.spec("form inputs", function() {
 			var valueSetter = installValueSetterSpy(input.d)
 
 			// Verify our assumptions about the outer element state
+			o(valueSetter.callCount).equals(0)
+			hijackFileInput(input.d, "")
 			o(valueSetter.callCount).equals(0)
 			input.d.value = "test.png"
 			o(valueSetter.callCount).equals(1)

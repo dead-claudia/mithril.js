@@ -14,9 +14,14 @@ import {numVars, routes, stringVars, templates} from "./routes.js"
 
 async function setup() {
 	if (typeof window === "undefined") {
-		// Gotta use `eval` here for Node.
+		// Gotta use `eval` here for Node, so this script can otherwise assume no dynamic import.
 		// eslint-disable-next-line no-eval
-		await eval('import("../test-utils/injectBrowserMock.js")')
+		const {JSDOM} = await eval('import("jsdom")')
+		const jsdom = new JSDOM("<!doctype html>", {pretendToBeVisual: true})
+		// eslint-disable-next-line no-undef
+		global.window = jsdom.window
+		// eslint-disable-next-line no-undef
+		global.document = jsdom.window.document
 	}
 }
 

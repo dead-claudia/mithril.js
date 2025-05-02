@@ -6,8 +6,8 @@ import o from "ospec"
 
 import m from "../src/entry/mithril.esm.js"
 
-import browserMock from "./browserMock.js"
 import {clearPending} from "./callAsync.js"
+import {createLocationProxy} from "./navigation.js"
 import throttleMocker from "./throttleMock.js"
 
 const G = (
@@ -16,31 +16,91 @@ const G = (
 		: typeof window !== "undefined" ? window : global
 )
 
-const originalWindow = G.window
-const originalDocument = G.document
+const originalWindow = G.window || G.jsdomWindow
+const originalDocument = G.document || G.jsdomDocument
 const originalConsoleError = console.error
 
-export function restoreDOMGlobals() {
-	G.window = originalWindow
-	G.document = originalDocument
+if (originalWindow === undefined || originalDocument === undefined) {
+	throw new TypeError("DOM globals must be present and pre-loaded")
 }
+
+let prevWindow = originalWindow
+let prevDocument = originalDocument
+let prevConsoleError = originalConsoleError
 
 /**
  * @typedef SetupState
  * @property {Set<any>} registeredRoots
- * @property {ReturnType<import("./browserMock.js")["default"]>} $window
+ * @property {HTMLIFrameElement} iframe
+ * @property {Window & typeof globalThis} hackWindow
  * @property {ReturnType<import("./throttleMock.js")["default"]>} rafMock
  */
 
 /** @returns {SetupState} */
 function doInit(env) {
-	const $window = browserMock(env)
+	const iframe = originalDocument.createElement("iframe")
+	iframe.srcdoc = "<!doctype html>"
+	// Have to append it live so that the window gets initialized. It gets removed at the end of
+	// the test, after unmounting (so it correctly gets removed).
+	originalDocument.body.appendChild(iframe)
+
+	const $window = iframe.contentWindow
+
+	// Suggests a failure to immediately initialize the iframe.
+	if (!$window) {
+		// Remove so it doesn't leak. I don't want to go through this song and dance *that* many
+		// times.
+		iframe.remove()
+		throw new Error("Could not construct window (likely browser bug)")
+	}
+
+	// There's at the time of writing a bug in JSDOM where windows for blank, synchronously
+	// detached iframes return `undefined` for `window.document`. This is not the case in Chrome,
+	// but this unblocks use of JSDOM in tests so I'm not going through the complexity of wiring
+	// everything up in Puppeteer just for correct behavior.
+	if (!$window.document) {
+		// Remove so it doesn't leak. I don't want to go through this song and dance *that* many
+		// times.
+		iframe.remove()
+		throw new Error("Could not construct document (likely browser bug)")
+	}
+
 	const rafMock = throttleMocker()
-	const registeredRoots = new Set([$window.document.body])
-	G.window = $window.window
-	G.document = $window.document
-	$window.requestAnimationFrame = rafMock.schedule
-	$window.cancelAnimationFrame = rafMock.clear
+
+	// Extreme hack to replace the location object in the window.
+	//
+	// I can't just overwrite `location` as it's `[LegacyUnforgeable]` and thus not configurable.
+	// Also, I have to use getters and setters to preserve the `[PutForwards=href]` IDL attribute's
+	// behavior.
+	//
+	// And finally, since Mithril uses `elem.ownerDocument.defaultView` to get the window in many
+	// cases, I have to hack that in as well.
+	const hackDescriptors = Object.getOwnPropertyDescriptors($window)
+	hackDescriptors.location.get = () => location
+	hackDescriptors.location.set = (v) => { location.href = v }
+	hackDescriptors.history.get = () => history
+	/** @type {Window & typeof globalThis} */
+	const hackWindow = Object.create(Object.getPrototypeOf($window), hackDescriptors)
+	const {location, history} = createLocationProxy(hackWindow, env)
+	// Also, to ensure this is transparent to window accesses via `root.ownerDocument.defaultView`,
+	// hack that to return the proxied window as well.
+	const oldDefaultView = Object.getOwnPropertyDescriptor(hackWindow.Document.prototype, "defaultView").get
+	Object.defineProperty(hackWindow.Document.prototype, "defaultView", {
+		get() {
+			const result = oldDefaultView.call(this)
+			return result === $window ? hackWindow : result
+		},
+	})
+
+	hackWindow.requestAnimationFrame = rafMock.schedule
+	hackWindow.cancelAnimationFrame = rafMock.clear
+
+	prevWindow = G.window
+	prevDocument = G.document
+	prevConsoleError = console.error
+
+	G.window = hackWindow
+	G.document = hackWindow.document
 
 	if (env && env.expectNoConsoleError) {
 		console.error = (...args) => {
@@ -57,7 +117,8 @@ function doInit(env) {
 			originalConsoleError.apply(console, args)
 		}
 	}
-	return {$window, rafMock, registeredRoots}
+
+	return {iframe, hackWindow, rafMock, registeredRoots: new Set([hackWindow.document.body])}
 }
 
 /** @param {SetupState} state */
@@ -70,8 +131,10 @@ function doCleanup(state) {
 			errors.push(e)
 		}
 	}
-	restoreDOMGlobals()
-	console.error = originalConsoleError
+	state.iframe.remove()
+	G.window = prevWindow
+	G.document = prevDocument
+	console.error = prevConsoleError
 	clearPending()
 	o(errors).deepEquals([])
 	errors.length = 0
@@ -84,10 +147,6 @@ class GlobalState {
 		this.register = (root) => {
 			this._.registeredRoots.add(root)
 			return root
-		}
-
-		this.initialize = (env) => {
-			this._ = doInit(env)
 		}
 
 		o.beforeEach(() => {
@@ -104,7 +163,7 @@ class GlobalState {
 	}
 
 	get window() {
-		return this._.$window
+		return this._.hackWindow
 	}
 
 	get rafMock() {
@@ -112,7 +171,7 @@ class GlobalState {
 	}
 
 	get root() {
-		return this._.$window.document.body
+		return this.window.document.body
 	}
 }
 

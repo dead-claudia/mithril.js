@@ -726,15 +726,28 @@ o.spec("hyperscript", function() {
 		var G = setupGlobals()
 
 		o("works", () => {
-			var e = G.window.document.createEvent("MouseEvents")
-			e.initEvent("click", true, true)
+			var parent = G.window.document.createElement("div")
+			var child = G.window.document.createElement("div")
+			var parentCalled = false
+			var captureResult
 
-			// Only doing this for the sake of initializing the required fields in the mock.
-			G.root.dispatchEvent(e)
+			parent.onclick = () => {
+				parentCalled = true
+			}
 
-			o(m.capture(e)).equals("skip-redraw")
+			child.onclick = (e) => {
+				captureResult = m.capture(e)
+			}
+
+			parent.append(child)
+
+			var e = new G.window.TouchEvent("click", {bubbles: true, cancelable: true})
+
+			child.dispatchEvent(e)
+
 			o(e.defaultPrevented).equals(true)
-			o(e.cancelBubble).equals(true)
+			o(captureResult).equals("skip-redraw")
+			o(parentCalled).equals(false)
 		})
 	})
 })
