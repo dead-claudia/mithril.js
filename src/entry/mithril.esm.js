@@ -1,5 +1,6 @@
 import m from "../core.js"
 
+import {interval, sleep} from "../std/timers.js"
 import {link, route} from "../std/router.js"
 import {match, p, query} from "../std/path-query.js"
 import {tracked, trackedList} from "../std/tracked.js"
@@ -19,5 +20,7 @@ m.init = init
 m.tracked = tracked
 m.trackedList = trackedList
 m.limiter = limiter
+m.sleep = sleep
+m.interval = interval
 
 export default m
