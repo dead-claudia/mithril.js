@@ -1,13 +1,30 @@
+import {run} from "./context/dyn.js"
+
 export var hasOwn = {}.hasOwnProperty
 
-export var invokeRedrawable = async (redraw, fn, thisValue, ...args) => {
-	if (typeof fn === "function") {
-		thisValue = Reflect.apply(fn, thisValue, args)
-		if (thisValue === "skip-redraw") return
-		if (thisValue && typeof thisValue.then === "function" && (await thisValue) === "skip-redraw") return
-		redraw()
-	}
-}
+// Specially coded so it's just one arrow function expression and just reuses the input variables.
+// It won't minify like this otherwise without making it even less readable.
+//
+// Only really done to reduce size.
+export var invokeRedrawable = (snap, redraw, fn, thisValue, ...args) => (
+	typeof fn === "function" &&
+	(thisValue = snap.call(thisValue, fn, ...args)) !== "skip-redraw" &&
+	(
+		thisValue &&
+		(
+			thisValue = typeof thisValue.then === "function"
+				? Promise.resolve(thisValue)
+				: (
+					typeof thisValue === "object" ||
+					typeof thisValue === "function"
+				) && typeof thisValue[Symbol.iterator] === "function"
+					? snap(run, () => thisValue)
+					: null
+		)
+			? thisValue.then((value) => value !== "skip-redraw" && redraw())
+			: redraw()
+	)
+)
 
 /**
  * @type {{

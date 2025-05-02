@@ -5,7 +5,8 @@ import {checkCallback, invokeRedrawable} from "../util.js"
 function Init({f}, old) {
 	if (old) return m.retain()
 	var ctrl = new AbortController()
-	queueMicrotask(() => invokeRedrawable(this.redraw, f, undefined, ctrl.signal))
+	var s = m.snap()
+	queueMicrotask(() => invokeRedrawable(s, this.redraw, f, undefined, ctrl.signal))
 	return m.remove(() => ctrl.abort())
 }
 
